@@ -17,4 +17,4 @@ Here is the demo
 Web based (JavaScript) planner tool for CCTV using OpenStreetMaps/Google maps and some point-and-click camera placement. You can choose FOV, Range, etc.
 
 
-![Image](https://github.com/user-attachments/assets/0f19ba2b-05e1-4174-99b8-8fd2af7b1795)
+![Image](https://github.com/user-attachments/assets/7b4682c8-49f2-4613-92d6-2a98aa8c117e)
