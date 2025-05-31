@@ -5,6 +5,7 @@ I have added features I want. They are:
 - ability to name cameras and have a notes field. These are only visible on the right not to clutter the map
 - ability to copy camera specs from another (so you don't have to set the same many times)
 - ability to save and load your project.
+- ability to reposition cameras.
 
 Here is the demo 
 

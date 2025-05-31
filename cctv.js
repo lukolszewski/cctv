@@ -1,6 +1,9 @@
 var toolsEl = document.getElementById('tools');
 var cameras = [];
 var currentCam = null;
+var isDraggingCamera = false;
+var dragStartPos = null;
+var draggedCamera = null;
 
 Math.degrees = function(radians) {
     return radians * 180 / Math.PI;
@@ -51,8 +54,29 @@ function addCamera(latlng) {
         radius: 0.5
     }).addTo(map);
 
-    ndPolygon.on('click', function(e) { L.DomEvent.stopPropagation(e); setCurrent(cam) });
-    ndCentre.on('click', function(e) { L.DomEvent.stopPropagation(e); setCurrent(cam) });
+    ndPolygon.on('click', function(e) { 
+        if (!isDraggingCamera) {
+            L.DomEvent.stopPropagation(e); 
+            setCurrent(cam);
+        }
+    });
+    
+    ndCentre.on('click', function(e) { 
+        if (!isDraggingCamera) {
+            L.DomEvent.stopPropagation(e); 
+            setCurrent(cam);
+        }
+    });
+    
+    // Add drag functionality to the center circle
+    ndCentre.on('mousedown', function(e) {
+        startCameraDrag(cam, e);
+    });
+    
+    // Add visual feedback for draggable cameras
+    if (ndCentre.getElement()) {
+        ndCentre.getElement().classList.add('camera-draggable');
+    }
 
     cam.ndPolygon = ndPolygon;
     cam.ndCentre = ndCentre;
@@ -79,6 +103,87 @@ function findNearbyCamera(clickedLatLng, thresholdMeters = 10) {
     return closestCamera;
 }
 
+/**
+ * Start dragging a camera
+ */
+function startCameraDrag(cam, e) {
+    isDraggingCamera = true;
+    draggedCamera = cam;
+    dragStartPos = e.latlng;
+    
+    // Disable map dragging
+    map.dragging.disable();
+    
+    // Add visual feedback
+    document.body.classList.add('dragging-camera');
+    cam.ndCentre.getElement().style.cursor = 'grabbing';
+    
+    // Prevent event propagation
+    L.DomEvent.stopPropagation(e);
+    L.DomEvent.preventDefault(e);
+}
+
+/**
+ * Handle camera dragging
+ */
+function dragCamera(e) {
+    if (!isDraggingCamera || !draggedCamera) return;
+    
+    // Update camera position
+    draggedCamera.position = e.latlng;
+    
+    // Update the visual elements
+    draggedCamera.ndCentre.setLatLng(e.latlng);
+    renderCam(draggedCamera);
+    
+    // Update the tools panel if this is the current camera
+    if (currentCam === draggedCamera) {
+        updatePositionDisplay(draggedCamera);
+    }
+    
+    L.DomEvent.stopPropagation(e);
+    L.DomEvent.preventDefault(e);
+}
+
+/**
+ * End camera dragging
+ */
+function endCameraDrag(e) {
+    if (!isDraggingCamera) return;
+    
+    isDraggingCamera = false;
+    draggedCamera = null;
+    dragStartPos = null;
+    
+    // Re-enable map dragging
+    map.dragging.enable();
+    
+    // Remove visual feedback
+    document.body.classList.remove('dragging-camera');
+    
+    // Reset cursor for all camera centers
+    cameras.forEach(function(cam) {
+        if (cam.ndCentre.getElement()) {
+            cam.ndCentre.getElement().style.cursor = 'grab';
+        }
+    });
+}
+
+/**
+ * Update position display in tools panel
+ */
+function updatePositionDisplay(cam) {
+    var positionElements = toolsEl.querySelectorAll('br');
+    if (positionElements.length >= 2) {
+        // Find the position text and update it
+        var nameInput = document.getElementById('fld-name');
+        if (nameInput && nameInput.nextSibling && nameInput.nextSibling.nextSibling) {
+            nameInput.nextSibling.nextSibling.textContent = cam.position.lat.toFixed(6);
+            nameInput.nextSibling.nextSibling.nextSibling.textContent = cam.position.lng.toFixed(6);
+        }
+    }
+}
+
 function calcFov(sensorSize, focalLength) {
     return Math.degrees(2 * Math.atan(sensorSize / (2.0 * focalLength)));
 }
@@ -98,8 +203,8 @@ function setCurrent(cam) {
     }
     
     toolsEl.innerHTML = `
-        Name: <input type="text" id="fld-name" value="${cam.name}" style="width: 200px; margin-bottom: 10px;"><br>
-        ${cam.position.lat}<br>${cam.position.lng}
+    Name: <input type="text" id="fld-name" value="${cam.name}" style="width: 200px; margin-bottom: 10px;"><br>
+    ${cam.position.lat.toFixed(6)}<br>${cam.position.lng.toFixed(6)}
         <br>
         Angle: <input type="range" min="-360" max="360" id="fld-angle" value="${cam.angle}"> <span id="angle-value">${cam.angle}&deg;</span>
         <br>
@@ -293,8 +398,29 @@ function loadSetup(file) {
                     radius: 0.5
                 }).addTo(map);
                 
-                ndPolygon.on('click', function(e) { L.DomEvent.stopPropagation(e); setCurrent(cam) });
-                ndCentre.on('click', function(e) { L.DomEvent.stopPropagation(e); setCurrent(cam) });
+                ndPolygon.on('click', function(e) { 
+                    if (!isDraggingCamera) {
+                        L.DomEvent.stopPropagation(e); 
+                        setCurrent(cam);
+                    }
+                });
+                
+                ndCentre.on('click', function(e) { 
+                    if (!isDraggingCamera) {
+                        L.DomEvent.stopPropagation(e); 
+                        setCurrent(cam);
+                    }
+                });
+                
+                // Add drag functionality to the center circle
+                ndCentre.on('mousedown', function(e) {
+                    startCameraDrag(cam, e);
+                });
+                
+                // Add visual feedback for draggable cameras
+                if (ndCentre.getElement()) {
+                    ndCentre.getElement().classList.add('camera-draggable');
+                }
                 
                 cam.ndPolygon = ndPolygon;
                 cam.ndCentre = ndCentre;
@@ -382,6 +508,12 @@ function init() {
         }
     });
     map.on('moveend', (e) => setUrlCoords(map));
+    // Add global mouse event listeners for camera dragging
+    map.on('mousemove', dragCamera);
+    map.on('mouseup', endCameraDrag);
+
+    // Handle case where mouse leaves the map during drag
+    map.getContainer().addEventListener('mouseleave', endCameraDrag);
 
     window.map = map;
     initSaveLoad();
