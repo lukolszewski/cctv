@@ -30,6 +30,7 @@ function buildPolyCoords(latlng, facingAngle, spanAngle, distMetres) {
  */
 function addCamera(latlng) {
     var cam = {
+        name: 'Camera ' + (cameras.length + 1), // Add name field with default value
         position: latlng,
         angle: 0,
         sensorSize: 6.43,   // mm diagional = 1/2.8"
@@ -87,6 +88,7 @@ function calcFov(sensorSize, focalLength) {
  */
 function setCurrent(cam) {
     toolsEl.innerHTML = `
+        Name: <input type="text" id="fld-name" value="${cam.name}" style="width: 200px; margin-bottom: 10px;"><br>
         ${cam.position.lat}<br>${cam.position.lng}
         <br>
         Angle: <input type="range" min="-360" max="360" id="fld-angle" value="${cam.angle}"> <span id="angle-value">${cam.angle}&deg;</span>
@@ -100,6 +102,10 @@ function setCurrent(cam) {
         <br>Notes:<br>
         <textarea id="fld-notes" rows="4" cols="30" placeholder="Enter camera notes...">${cam.notes}</textarea>
     `;
+
+    document.getElementById('fld-name').addEventListener('input', (e) => { 
+        cam.name = e.target.value; 
+    });
 
     document.getElementById('fld-angle').addEventListener('input', (e) => { 
         cam.angle = parseFloat(e.target.value); 
@@ -163,6 +169,7 @@ function saveSetup() {
     // Create a clean copy of cameras without the Leaflet objects
     var camerasData = cameras.map(function(cam) {
         return {
+            name: cam.name,  // Add name to saved data
             position: {
                 lat: cam.position.lat,
                 lng: cam.position.lng
@@ -224,6 +231,7 @@ function loadSetup(file) {
             setupData.cameras.forEach(function(camData) {
                 var latlng = L.latLng(camData.position.lat, camData.position.lng);
                 var cam = {
+                    name: camData.name || 'Camera ' + (cameras.length + 1), // Handle backward compatibility
                     position: latlng,
                     angle: camData.angle,
                     sensorSize: camData.sensorSize,
