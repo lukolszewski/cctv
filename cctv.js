@@ -87,6 +87,16 @@ function calcFov(sensorSize, focalLength) {
  * Set the current camera in the tools panel
  */
 function setCurrent(cam) {
+    // Build dropdown options for other cameras
+    var otherCameras = cameras.filter(function(c) { return c !== cam; });
+    var dropdownOptions = '';
+    if (otherCameras.length > 0) {
+        dropdownOptions = '<option value="">Select camera to copy from...</option>';
+        otherCameras.forEach(function(c) {
+            dropdownOptions += `<option value="${cameras.indexOf(c)}">${c.name}</option>`;
+        });
+    }
+    
     toolsEl.innerHTML = `
         Name: <input type="text" id="fld-name" value="${cam.name}" style="width: 200px; margin-bottom: 10px;"><br>
         ${cam.position.lat}<br>${cam.position.lng}
@@ -101,6 +111,12 @@ function setCurrent(cam) {
         <br>
         <br>Notes:<br>
         <textarea id="fld-notes" rows="4" cols="30" placeholder="Enter camera notes...">${cam.notes}</textarea>
+        <br><br>
+        Copy from camera:<br>
+        <select id="copy-camera-dropdown" style="width: 200px; margin-bottom: 10px;" ${otherCameras.length === 0 ? 'disabled' : ''}>
+            ${otherCameras.length === 0 ? '<option value="">No other cameras</option>' : dropdownOptions}
+        </select><br>
+        <button id="copy-specs-btn" style="padding: 5px 10px; background-color: #28a745; color: white; border: none; border-radius: 3px; cursor: pointer;" ${otherCameras.length === 0 ? 'disabled' : ''}>Copy Specs</button>
     `;
 
     document.getElementById('fld-name').addEventListener('input', (e) => { 
@@ -129,6 +145,17 @@ function setCurrent(cam) {
         cam.notes = e.target.value; 
     });
 
+    // Add copy specs functionality
+    if (otherCameras.length > 0) {
+        document.getElementById('copy-specs-btn').addEventListener('click', function() {
+            var selectedIndex = document.getElementById('copy-camera-dropdown').value;
+            if (selectedIndex !== '') {
+                var sourceCam = cameras[parseInt(selectedIndex)];
+                copySpecs(cam, sourceCam);
+            }
+        });
+    }
+
     currentCam = cam;
 }
 
@@ -137,6 +164,21 @@ function renderCam(cam) {
     cam.ndPolygon.setLatLngs(coords);
 }
 
+/**
+ * Copy specs from source camera to target camera (FOV, range, and notes only)
+ */
+function copySpecs(targetCam, sourceCam) {
+    // Copy the specs (but not position or angle)
+    targetCam.fov = sourceCam.fov;
+    targetCam.range = sourceCam.range;
+    targetCam.notes = sourceCam.notes;
+    
+    // Re-render the camera with new specs
+    renderCam(targetCam);
+    
+    // Refresh the current camera display to show updated values
+    setCurrent(targetCam);
+}
 
 function startMapCoords() {
     var urlParams = new URLSearchParams(window.location.search);
