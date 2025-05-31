@@ -6,6 +6,7 @@ I have added features I want. They are:
 - ability to copy camera specs from another (so you don't have to set the same many times)
 - ability to save and load your project.
 - ability to reposition cameras.
+- ability to delete cameras
 
 Here is the demo 
 

@@ -221,7 +221,8 @@ function setCurrent(cam) {
         <select id="copy-camera-dropdown" style="width: 200px; margin-bottom: 10px;" ${otherCameras.length === 0 ? 'disabled' : ''}>
             ${otherCameras.length === 0 ? '<option value="">No other cameras</option>' : dropdownOptions}
         </select><br>
-        <button id="copy-specs-btn" style="padding: 5px 10px; background-color: #28a745; color: white; border: none; border-radius: 3px; cursor: pointer;" ${otherCameras.length === 0 ? 'disabled' : ''}>Copy Specs</button>
+        <button id="copy-specs-btn" style="padding: 5px 10px; background-color: #28a745; color: white; border: none; border-radius: 3px; cursor: pointer; margin-right: 10px;" ${otherCameras.length === 0 ? 'disabled' : ''}>Copy Specs</button>
+        <button id="delete-camera-btn" style="padding: 5px 10px; background-color: #dc3545; color: white; border: none; border-radius: 3px; cursor: pointer;">Delete Camera</button>
     `;
 
     document.getElementById('fld-name').addEventListener('input', (e) => { 
@@ -261,6 +262,11 @@ function setCurrent(cam) {
         });
     }
 
+    // Add delete camera functionality
+    document.getElementById('delete-camera-btn').addEventListener('click', function() {
+        deleteCamera(cam);
+    });
+
     currentCam = cam;
 }
 
@@ -283,6 +289,59 @@ function copySpecs(targetCam, sourceCam) {
     
     // Refresh the current camera display to show updated values
     setCurrent(targetCam);
+}
+
+/**
+ * Delete a camera with confirmation
+ */
+function deleteCamera(cam) {
+    var confirmMessage = `Are you sure you want to delete "${cam.name}"?\n\nThis action cannot be undone.`;
+    
+    if (confirm(confirmMessage)) {
+        // Remove the camera from the map
+        map.removeLayer(cam.ndPolygon);
+        map.removeLayer(cam.ndCentre);
+        
+        // Remove from cameras array
+        var index = cameras.indexOf(cam);
+        if (index > -1) {
+            cameras.splice(index, 1);
+        }
+        
+        // Clear the tools panel if this was the current camera
+        if (currentCam === cam) {
+            currentCam = null;
+            toolsEl.innerHTML = '<p>Camera deleted.<br>Click on a camera or add a new one by clicking on the map.</p>';
+        }
+        
+        // If this was a dragged camera, clear drag state
+        if (draggedCamera === cam) {
+            endCameraDrag();
+        }
+        
+        // Renumber remaining cameras if desired (optional)
+        renumberCameras();
+    }
+}
+
+/**
+ * Renumber cameras to maintain sequential numbering after deletion
+ */
+function renumberCameras() {
+    cameras.forEach(function(cam, index) {
+        // Only renumber if it's a default name (starts with "Camera ")
+        if (cam.name.startsWith('Camera ')) {
+            cam.name = 'Camera ' + (index + 1);
+        }
+    });
+    
+    // If current camera is selected and has a default name, update the display
+    if (currentCam && currentCam.name.startsWith('Camera ')) {
+        var nameInput = document.getElementById('fld-name');
+        if (nameInput) {
+            nameInput.value = currentCam.name;
+        }
+    }
 }
 
 function startMapCoords() {
