@@ -153,6 +153,149 @@ function setUrlCoords(map) {
     history.replaceState(null, '', newUrl);
 }
 
+/**
+ * Save the current setup to a JSON file
+ */
+function saveSetup() {
+    var mapCenter = map.getCenter();
+    var mapZoom = map.getZoom();
+    
+    // Create a clean copy of cameras without the Leaflet objects
+    var camerasData = cameras.map(function(cam) {
+        return {
+            position: {
+                lat: cam.position.lat,
+                lng: cam.position.lng
+            },
+            angle: cam.angle,
+            sensorSize: cam.sensorSize,
+            focalLength: cam.focalLength,
+            range: cam.range,
+            fov: cam.fov,
+            notes: cam.notes
+        };
+    });
+    
+    var setupData = {
+        version: "1.0",
+        timestamp: new Date().toISOString(),
+        mapView: {
+            center: {
+                lat: mapCenter.lat,
+                lng: mapCenter.lng
+            },
+            zoom: mapZoom
+        },
+        cameras: camerasData
+    };
+    
+    // Create and download the file
+    var dataStr = JSON.stringify(setupData, null, 2);
+    var dataBlob = new Blob([dataStr], {type: 'application/json'});
+    
+    var link = document.createElement('a');
+    link.href = URL.createObjectURL(dataBlob);
+    link.download = 'cctv-setup-' + new Date().toISOString().slice(0, 10) + '.json';
+    link.click();
+}
+
+/**
+ * Load a setup from a JSON file
+ */
+function loadSetup(file) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            var setupData = JSON.parse(e.target.result);
+            
+            // Validate the file format
+            if (!setupData.version || !setupData.cameras || !setupData.mapView) {
+                alert('Invalid setup file format');
+                return;
+            }
+            
+            // Clear existing cameras
+            clearAllCameras();
+            
+            // Restore map view
+            map.setView([setupData.mapView.center.lat, setupData.mapView.center.lng], setupData.mapView.zoom);
+            
+            // Restore cameras
+            setupData.cameras.forEach(function(camData) {
+                var latlng = L.latLng(camData.position.lat, camData.position.lng);
+                var cam = {
+                    position: latlng,
+                    angle: camData.angle,
+                    sensorSize: camData.sensorSize,
+                    focalLength: camData.focalLength,
+                    range: camData.range,
+                    fov: camData.fov,
+                    notes: camData.notes || ''
+                };
+                
+                var coords = buildPolyCoords(cam.position, cam.angle, cam.fov, cam.range);
+                var ndPolygon = L.polygon(coords).addTo(map);
+                
+                var ndCentre = L.circle([cam.position.lat, cam.position.lng], {
+                    color: 'red',
+                    fillColor: '#f03',
+                    fillOpacity: 0.5,
+                    radius: 0.5
+                }).addTo(map);
+                
+                ndPolygon.on('click', function(e) { L.DomEvent.stopPropagation(e); setCurrent(cam) });
+                ndCentre.on('click', function(e) { L.DomEvent.stopPropagation(e); setCurrent(cam) });
+                
+                cam.ndPolygon = ndPolygon;
+                cam.ndCentre = ndCentre;
+                cameras.push(cam);
+            });
+            
+            // Clear current selection
+            currentCam = null;
+            toolsEl.innerHTML = '<p>Setup loaded successfully!<br>Click on a camera or add a new one by clicking on the map.</p>';
+            
+            // Update URL to reflect new position
+            setUrlCoords(map);
+            
+        } catch (error) {
+            alert('Error loading setup file: ' + error.message);
+        }
+    };
+    reader.readAsText(file);
+}
+
+/**
+ * Clear all cameras from the map
+ */
+function clearAllCameras() {
+    cameras.forEach(function(cam) {
+        map.removeLayer(cam.ndPolygon);
+        map.removeLayer(cam.ndCentre);
+    });
+    cameras = [];
+    currentCam = null;
+    toolsEl.innerHTML = '';
+}
+
+/**
+ * Initialize save/load event listeners
+ */
+function initSaveLoad() {
+    document.getElementById('save-setup').addEventListener('click', function() {
+        saveSetup();
+    });
+    
+    document.getElementById('load-setup').addEventListener('change', function(e) {
+        var file = e.target.files[0];
+        if (file) {
+            loadSetup(file);
+        }
+        // Reset file input so the same file can be loaded again if needed
+        e.target.value = '';
+    });
+}
+
 
 function init() {
     // OpenStreetMap
@@ -191,6 +334,7 @@ function init() {
     map.on('moveend', (e) => setUrlCoords(map));
 
     window.map = map;
+    initSaveLoad();
 }
 
 
