@@ -35,6 +35,7 @@ function addCamera(latlng) {
         sensorSize: 6.43,   // mm diagional = 1/2.8"
         focalLength: 2.8,   // mm
         range: 30,          // metres
+        notes: '',          // Add notes field
     };
 
     cam.fov = calcFov(cam.sensorSize, cam.focalLength);
@@ -50,12 +51,31 @@ function addCamera(latlng) {
     }).addTo(map);
 
     ndPolygon.on('click', function(e) { L.DomEvent.stopPropagation(e); setCurrent(cam) });
+    ndCentre.on('click', function(e) { L.DomEvent.stopPropagation(e); setCurrent(cam) });
 
     cam.ndPolygon = ndPolygon;
     cam.ndCentre = ndCentre;
     cameras.push(cam);
 
     setCurrent(cam);
+}
+
+/**
+ * Find the closest camera to a given point within a threshold distance
+ */
+function findNearbyCamera(clickedLatLng, thresholdMeters = 10) {
+    var closestCamera = null;
+    var closestDistance = Infinity;
+    
+    cameras.forEach(function(cam) {
+        var distance = map.distance(clickedLatLng, cam.position);
+        if (distance < thresholdMeters && distance < closestDistance) {
+            closestDistance = distance;
+            closestCamera = cam;
+        }
+    });
+    
+    return closestCamera;
 }
 
 function calcFov(sensorSize, focalLength) {
@@ -69,18 +89,39 @@ function setCurrent(cam) {
     toolsEl.innerHTML = `
         ${cam.position.lat}<br>${cam.position.lng}
         <br>
-        Angle: <input type="range" min="-360" max="360" id="fld-angle" value="${cam.angle}"> degrees
+        Angle: <input type="range" min="-360" max="360" id="fld-angle" value="${cam.angle}"> <span id="angle-value">${cam.angle}&deg;</span>
         <br>
         <br>Sensor: ${cam.sensorSize}mm
         <br>Focal Len: ${cam.focalLength}mm
         <br>
-        <br>Range: <input type="range" min="1" max="100" id="fld-range" value="${cam.range}"> meters
-        <br>FOV: <input type="range" min="1" max="359" id="fld-fov" value="${cam.fov}"> degrees
+        <br>Range: <input type="range" min="1" max="100" id="fld-range" value="${cam.range}"> <span id="range-value">${cam.range}m</span>
+        <br>FOV: <input type="range" min="1" max="359" id="fld-fov" value="${cam.fov}"> <span id="fov-value">${cam.fov.toFixed(1)}&deg;</span>
+        <br>
+        <br>Notes:<br>
+        <textarea id="fld-notes" rows="4" cols="30" placeholder="Enter camera notes...">${cam.notes}</textarea>
     `;
 
-    document.getElementById('fld-angle').addEventListener('input', (e) => { cam.angle = parseFloat(e.target.value); renderCam(cam) });
-    document.getElementById('fld-range').addEventListener('input', (e) => { cam.range = parseFloat(e.target.value); renderCam(cam) });
-    document.getElementById('fld-fov').addEventListener('input', (e) => { cam.fov = parseFloat(e.target.value); renderCam(cam) });
+    document.getElementById('fld-angle').addEventListener('input', (e) => { 
+        cam.angle = parseFloat(e.target.value); 
+        document.getElementById('angle-value').innerHTML = cam.angle + '&deg;';
+        renderCam(cam);
+    });
+    
+    document.getElementById('fld-range').addEventListener('input', (e) => { 
+        cam.range = parseFloat(e.target.value); 
+        document.getElementById('range-value').textContent = cam.range + 'm';
+        renderCam(cam);
+    });
+    
+    document.getElementById('fld-fov').addEventListener('input', (e) => { 
+        cam.fov = parseFloat(e.target.value); 
+        document.getElementById('fov-value').innerHTML = cam.fov.toFixed(1) + '&deg;';
+        renderCam(cam);
+    });
+    
+    document.getElementById('fld-notes').addEventListener('input', (e) => { 
+        cam.notes = e.target.value; 
+    });
 
     currentCam = cam;
 }
@@ -139,7 +180,14 @@ function init() {
         "Google Satellite": sat,
     }, {}).addTo(map);
 
-    map.on('click', (e) => addCamera(e.latlng));
+    map.on('click', (e) => {
+        var nearbyCamera = findNearbyCamera(e.latlng);
+        if (nearbyCamera) {
+            setCurrent(nearbyCamera);
+        } else {
+            addCamera(e.latlng);
+        }
+    });
     map.on('moveend', (e) => setUrlCoords(map));
 
     window.map = map;
